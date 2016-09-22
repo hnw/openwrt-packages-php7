@@ -1,0 +1,14 @@
+*** packages-old/libs/openldap/Makefile	2016-09-15 23:38:23.000000000 +0900
+--- packages/libs/openldap/Makefile	2016-09-24 11:03:41.000000000 +0900
+***************
+*** 102,107 ****
+--- 102,110 ----
+  	--disable-monitor \
+  	--disable-relay
+  
++ CONFIGURE_VARS += \
++ 	ol_cv_lib_icu="no"
++ 
+  define Build/Compile
+  	$(MAKE) -C $(PKG_BUILD_DIR) \
+  		DESTDIR="$(PKG_INSTALL_DIR)" \
