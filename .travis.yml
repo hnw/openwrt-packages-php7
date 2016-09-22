@@ -1,0 +1,62 @@
+sudo: required
+language: c
+services: docker
+cache: ccache
+
+env:
+  global:
+    - IMG=yhnw/openwrt-sdk
+    - PKG_NAME=php7
+    - QUIET=1 # 1: suppress build log / "": output all
+  matrix:
+    - DISTRO=15.05.1 ARCH=ar71xx PKG_DIR=bin/ar71xx/packages
+
+before_install:
+  - docker version
+  - ccache -s | tee ccache.log
+
+script:
+  - docker run --rm -u openwrt -v $PWD:/work -v $HOME/.ccache:/home/openwrt/.ccache $IMG:${DISTRO}-${ARCH} /bin/bash /work/build.sh ${DISTRO}-${ARCH} $PKG_DIR $PKG_NAME $QUIET
+  - ls -la
+  - |
+    echo '### before build ###' &&
+    cat ccache.log &&
+    echo &&
+    echo '### after build ###' &&
+    ccache -s
+
+after_failure:
+  - if [[ -e build.log ]]; then tail -300 build.log; fi
+
+before_deploy:
+  - |
+    if [[ -n "$TRAVIS_TAG" ]]; then
+      export VERSION=stable;
+      export VCS_TAG="$TRAVIS_TAG";
+      export DESC="Stable release";
+      export UPLOAD_DIR_SUFFIX=;
+    else
+      export VERSION=develop;
+      export VCS_TAG=HEAD;
+      export DESC="Development snapshot";
+      export UPLOAD_DIR_SUFFIX=-dev;
+    fi
+  - RELEASED=$(date +%Y-%m-%d) envsubst < descriptor.json.in > descriptor.json
+  - cat descriptor.json
+
+deploy:
+  - provider: bintray
+    file: "descriptor.json"
+    user: hnw
+    key:
+      secure: "iY9g9f7recCEUSBgyRaU/R4FfDMHGb1+lDhrXPS6R+xU/a3nnbu8tWvYbNMnMa1GficsDhkZz6wHwZPIFHbqQ+XfEM6vMemchdTsmK1poVCLwNDhYdmOF0gY4fkKN/8poUc2l/xhgZot7rOQdaLDlTaxZXngqpzHRHDGpwO8W+GDNCOGBlGrfqXvxb0FnGk/CRmGtRNQPnK9H9dLtEqSUgF9sImjapGvt2rK8v/7yK6nu/g6YP5vpIvSjnNZFQfMBq6DJZ/Zu1XO6ut3CEfPcrMNfY+G3t+wF62x4nmbaQJ2rnQYVOtANsXs+oOsnG19W2UZfrf9E66LlcJLA/1FI2z5IOO9h0iaC4AGT0qPi7oo0o8OIx7j8sak/nQZYRkjbAW5R1fCnJ1hs4S9yyQngHIMYvz6Dh1whzN5KH1DuSCtWPP/bL75Ke8dX9Ggh6vq/RsbZtxhV9GTbLBW2L6ZkxN7ZtyrzZEtQMV1Rn7TAqX1dx3AMF7/p7IqYGn9FiG0QLpQFJ4mKvYZX6UDeHzJIt6u2n9/LBBGBpbaFAWOXEcyXA9WzTM//e8lSA0BgOTo7qM53bRxNgaLPoqzaZ9EsCaPW1+qqTg6dMjTNW/htSPyB6TMaTvd7eLepHNEt6abmQr4muDilx6RoEVNhQOdrlxB5cJ4MKGYeVGB/BgZAgc="
+    on:
+      all_branches: true
+  - provider: releases
+    api_key:
+      secure: "IMXMfxbur+QS0eHBOR/QiuIUeZdm3MfVwbgjJOtonOtqd2ZS+2c+XZtTSYtMze/fRhd6g2ei8R0qNBSuYFDKDm7Srvn/0ArV5KpI7WiVi2IBsTEa4aiJdUZ6rIwUotiMVFexBN7t7C5gne4WxD4OHOrxW9VUQrqMiKmORkfbY1APtRjxvZWp880KY3utW30dYPGqSj7qNd6mIfKbeAVmiCow6VwWmGMGc3dq5Cido0DGaGIurZ/Q9wNedM02nrosHPzY7gzm7JzPe3pdppmYdE7wANtla0FGxFRVIUf+PzroFFkzm8dnV/Q/9oI+2e43+tArUDY0df/g5/FErTaxKNixRCxqc8Mr01lmhwy5ozCdyZRmC4MEyhwso4qAAJajXckbWRe6nDig6PhgmjaEUVzXnW+8ISGhRLQ+75AyJhC00kHOMMkmj43XyH01kJ98maH2I9uBH5okfWMmogQdf8k8/yEPaOM/IxjxGe4+F7FnLL+euODH48T7Q0VQ6hx78G7SsUPpMJ86p8iww9biaICXar4VxqiREO3es3zN45JCf4hhmHVfY8TAwRSwp6qbbBsoxzokJe5+38Fefj2rzrveaNE6xsu5f+AYZs61ffIagk9BoV7jGZScASFU+g81C72O5dwuhakuIij+WYVKvp+yL2y7ML4+b8yJhzlpXaM="
+    file_glob: true
+    file: "pkgs-for-github/*.ipk"
+    skip_cleanup: true
+    on:
+      tags: true
